@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IEEE/ANSI 發電機與激磁機標準常規出廠測試解析</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #f8fafc; /* Tailwind slate-50 */
+            color: #1e293b; /* Tailwind slate-800 */
+        }
+        
+        /* Custom Scrollbar for better UI */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+
+        /* Essential Chart Container Styles */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 350px;
+            max-height: 400px;
+        }
+        @media (max-width: 768px) {
+            .chart-container {
+                height: 250px;
+            }
+        }
+        
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+
+        .test-card {
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+        }
+        .test-card:hover, .test-card.active {
+            transform: translateY(-2px);
+            border-color: #0284c7; /* Sky 600 */
+            box-shadow: 0 4px 6px -1px rgba(2, 132, 199, 0.1), 0 2px 4px -1px rgba(2, 132, 199, 0.06);
+        }
+        .test-card.active {
+            background-color: #f0f9ff; /* Sky 50 */
+            border-left-width: 4px;
+            border-left-color: #0284c7;
+        }
+        
+        .badge-mandatory { background-color: #ef4444; color: white; } /* Red */
+        .badge-duplicate { background-color: #f59e0b; color: white; } /* Amber */
+
+    </style>
+    <!-- Chosen Palette: Industrial Calm (Slate, Sky Blue, Stone, with Amber/Red accents for status) -->
+    <!-- Application Structure Plan: The application uses a dashboard layout. The top section introduces the context (IEEE/ANSI standards) and provides an interactive overview chart (Saturation Curve) which is a critical concept in generator testing. The lower section uses a master-detail pattern (left column list, right column details) to allow users to systematically explore all 16 tests without being overwhelmed by a wall of text. A filter toggle allows users to distinguish between mandatory per-unit tests and those where duplicate reports are acceptable (*), adding functional value to the raw list. -->
+    <!-- Visualization & Content Choices: 
+         1. Report Info: 16 Tests List -> Goal: Organize & Inform -> Viz: Interactive Master-Detail List -> Justification: Breaks down complex engineering text into digestible chunks.
+         2. Report Info: Test 7 & 8 (Saturation Curves) -> Goal: Inform/Demonstrate -> Viz: Line Chart (Chart.js) -> Justification: Visualizing the OCC/SCC is fundamental for electrical engineers to understand generator magnetic characteristics. It's much better than just reading "Saturation curve".
+         3. Report Info: Duplicate vs Mandatory -> Goal: Categorize -> Viz: Toggle Filter & Badges -> Justification: Quickly answers the project management question of "Do we need to pay for this specific test on this unit?".
+         Library used: Vanilla JS for logic, Chart.js for data viz. NO SVG used. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+</head>
+<body class="antialiased min-h-screen flex flex-col">
+
+    <!-- Header Section -->
+    <header class="bg-slate-900 text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl md:text-3xl font-bold tracking-tight">發電機與激磁機出廠測試解析</h1>
+                <p class="text-sm md:text-base text-slate-300 mt-1 font-light">依據 IEEE, ANSI & NEMA 標準規範 (16項常規測試)</p>
+            </div>
+            <div class="hidden md:flex items-center space-x-2 text-sm bg-slate-800 px-4 py-2 rounded-full border border-slate-700">
+                <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>系統狀態：專家解析模式</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        
+        <!-- Introduction Paragraph -->
+        <div class="mb-8 p-6 bg-white rounded-xl shadow-sm border border-slate-200">
+            <h2 class="text-xl font-bold text-slate-800 mb-3 border-b-2 border-sky-500 pb-2 inline-block">概述與規範要求</h2>
+            <p class="text-slate-600 leading-relaxed text-justify">
+                本系統將您提供的 16 項標準常規出廠測試（Standard Routine Factory Tests）轉化為互動式資料庫。這些測試依據最新的 <strong>ANSI、IEEE 及 NEMA 測試標準</strong> 制定，旨在確保發電機與激磁機在機械結構、絕緣系統及電氣特性上均達到出廠要求。
+                <br><br>
+                值得注意的是，帶有星號 <span class="text-amber-600 font-bold">(*)</span> 的項目屬於「型式測試」範疇或較耗時之測試，規範允許若製造廠能提供<strong>基本相同規格之發電機（duplicate generator）</strong>的合格測試報告，即可免除對該單獨機組進行重複測試，這在工程實務與專案時程控管上具有重要意義。
+            </p>
+        </div>
+
+        <!-- Dashboard Top Section: Analytics & Charts -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <!-- Stats & Filter Card -->
+            <div class="glass-panel rounded-xl p-6 shadow-sm flex flex-col justify-between">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-800 mb-4">測試項目結構分析</h3>
+                    <div class="flex justify-between items-center mb-4 p-4 bg-slate-50 rounded-lg border border-slate-100">
+                        <div class="text-center">
+                            <div class="text-3xl font-black text-slate-800">16</div>
+                            <div class="text-xs text-slate-500 font-medium">總測試項目</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-3xl font-black text-red-500">10</div>
+                            <div class="text-xs text-slate-500 font-medium">每台必測項目</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-3xl font-black text-amber-500">6</div>
+                            <div class="text-xs text-slate-500 font-medium">接受同型報告 (*)</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <label class="block text-sm font-medium text-slate-700 mb-2">篩選測試視圖：</label>
+                    <div class="flex space-x-2 bg-slate-100 p-1 rounded-lg">
+                        <button id="filter-all" class="flex-1 py-2 text-sm font-semibold rounded-md bg-white shadow-sm text-slate-800 transition-colors" onclick="filterTests('all')">顯示全部 (16)</button>
+                        <button id="filter-mandatory" class="flex-1 py-2 text-sm font-semibold rounded-md text-slate-500 hover:text-slate-800 transition-colors" onclick="filterTests('mandatory')">僅必測項目 (10)</button>
+                        <button id="filter-duplicate" class="flex-1 py-2 text-sm font-semibold rounded-md text-slate-500 hover:text-slate-800 transition-colors" onclick="filterTests('duplicate')">同型報告可 (*) (6)</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chart Card: OCC/SCC Demonstration -->
+            <div class="glass-panel rounded-xl p-6 shadow-sm lg:col-span-2">
+                <div class="flex justify-between items-end mb-4">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-800">發電機特性曲線模擬 (項目 7 & 8)</h3>
+                        <p class="text-xs text-slate-500">開路飽和曲線 (OCC) 與 短路飽和曲線 (SCC) 示意圖</p>
+                    </div>
+                </div>
+                <!-- Required Chart Container strict sizing -->
+                <div class="chart-container">
+                    <canvas id="saturationChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Interactive List & Details Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[800px] lg:h-[600px]">
+            
+            <!-- Left Column: Test List -->
+            <div class="lg:col-span-5 flex flex-col glass-panel rounded-xl shadow-sm overflow-hidden h-full">
+                <div class="p-4 bg-slate-50 border-b border-slate-200">
+                    <h3 class="font-bold text-slate-800">測試項目列表清單</h3>
+                    <p class="text-xs text-slate-500">點擊項目以查看專業分析報告</p>
+                </div>
+                <div id="test-list-container" class="overflow-y-auto flex-grow p-2 space-y-2">
+                    <!-- Javascript will populate this list -->
+                </div>
+            </div>
+
+            <!-- Right Column: Detail View -->
+            <div class="lg:col-span-7 glass-panel rounded-xl shadow-sm p-6 overflow-y-auto h-full flex flex-col relative">
+                <div id="welcome-message" class="absolute inset-0 flex flex-col items-center justify-center text-slate-400 bg-white z-10 rounded-xl">
+                    <div class="text-6xl mb-4">&#9881;</div> <!-- Unicode gear icon -->
+                    <p class="text-lg font-medium">請從左側選擇一個測試項目</p>
+                    <p class="text-sm mt-2">以檢視 IEEE/ANSI 專業詳細報告</p>
+                </div>
+
+                <div id="detail-content" class="hidden flex-col h-full opacity-0 transition-opacity duration-300">
+                    <div class="flex items-start justify-between border-b border-slate-200 pb-4 mb-4">
+                        <div>
+                            <div id="detail-number" class="text-sky-600 font-black text-xl mb-1">Item No.</div>
+                            <h2 id="detail-title-en" class="text-xl md:text-2xl font-bold text-slate-800">Title EN</h2>
+                            <h3 id="detail-title-zh" class="text-md font-medium text-slate-500 mt-1">Title ZH</h3>
+                        </div>
+                        <div id="detail-badge" class="px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap shadow-sm">
+                            Status
+                        </div>
+                    </div>
+
+                    <div class="space-y-6 flex-grow">
+                        <!-- Purpose -->
+                        <div class="bg-slate-50 rounded-lg p-4 border-l-4 border-sky-500">
+                            <h4 class="font-bold text-slate-700 flex items-center mb-2">
+                                <span class="mr-2 text-sky-500">&#127919;</span> 測試目的 (Purpose)
+                            </h4>
+                            <p id="detail-purpose" class="text-slate-600 text-sm leading-relaxed"></p>
+                        </div>
+
+                        <!-- Methodology -->
+                        <div>
+                            <h4 class="font-bold text-slate-700 flex items-center mb-2">
+                                <span class="mr-2 text-slate-400">&#128295;</span> 執行方法與標準規範 (Methodology & Standards)
+                            </h4>
+                            <p id="detail-method" class="text-slate-600 text-sm leading-relaxed bg-white border border-slate-200 rounded-lg p-4"></p>
+                        </div>
+
+                        <!-- Acceptance/Significance -->
+                        <div>
+                            <h4 class="font-bold text-slate-700 flex items-center mb-2">
+                                <span class="mr-2 text-emerald-500">&#10004;</span> 評估重點與驗收基準 (Acceptance Criteria)
+                            </h4>
+                            <ul id="detail-criteria" class="list-none space-y-2 text-sm text-slate-600 ml-1">
+                                <!-- JS injected LIs -->
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 text-slate-400 py-6 text-center text-xs mt-auto">
+        <p>Interactive engineering report conceptualized based on typical IEEE, ANSI, and NEMA standards for synchronous generators.</p>
+        <p class="mt-1">For educational and exploratory purposes.</p>
+    </footer>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        // --- 1. Data Source (The 16 Tests Detailed) ---
+        const generatorTests = [
+            {
+                id: 1,
+                titleEn: "Mechanical inspection",
+                titleZh: "機械檢查",
+                isDuplicateAllowed: false,
+                purpose: "確認發電機各機械部件之製造、組裝品質，確保外觀無損傷、尺寸符合設計圖說，為後續電氣測試奠定安全基礎。",
+                method: "以目視、游標卡尺、千分錶等工具進行量測。檢查項目包含：轉子與定子間隙（氣隙）均勻度、軸承座安裝尺寸、螺栓扭力確認、滑環與電刷（若有）之接觸面狀態，以及冷卻系統與管路配置。",
+                criteria: [
+                    "氣隙變異率（Air gap variation）須小於規範容許值（通常 < 5%）。",
+                    "所有結構螺栓均達到規範的鎖緊扭力值，並標示防鬆標記。",
+                    "無可見之機械損傷、鏽蝕或組裝不良。"
+                ]
+            },
+            {
+                id: 2,
+                titleEn: "Resistance of armature and field windings",
+                titleZh: "電樞與磁場繞組電阻測量",
+                isDuplicateAllowed: false,
+                purpose: "量測定子（電樞）與轉子（磁場）繞組之直流電阻，用以驗證導體截面積、線圈匝數正確性，以及焊接/壓接點是否良好。此數據亦為計算銅損及溫升測試的基準。",
+                method: "使用四線式微歐姆計（Kelvin bridge method 或 Digital Low Resistance Ohmmeter），在室溫下進行量測。量測後必須利用公式將電阻值換算至標準基準溫度（例如 75°C 或 85°C 或依照絕緣等級規定）。",
+                criteria: [
+                    "三相定子繞組電阻不平衡率通常需極小（例如最大與最小相差不超過 1~2%）。",
+                    "測量值需與原廠設計計算值相符。",
+                    "換算至基準溫度後之數值將記錄於銘牌或出廠報告中。"
+                ]
+            },
+            {
+                id: 3,
+                titleEn: "Dielectric tests of armature and field windings",
+                titleZh: "電樞與磁場繞組介電/耐壓測試 (Hi-pot Test)",
+                isDuplicateAllowed: false,
+                purpose: "驗證發電機絕緣系統承受異常過電壓的能力，確保在運轉中發生突波或雷擊時絕緣不會崩潰（Breakdown），保障設備與人員安全。",
+                method: "依據 IEEE 規範，對定子繞組施加交流（AC）測試電壓，通常公式為 `(2 * 額定線電壓 + 1000) 伏特`，持續一分鐘。轉子磁場繞組則通常施加 10 倍額定激磁電壓（但不低於 1500V 等，依具體標準而定）。測試時，非受測相與外殼必須接地。",
+                criteria: [
+                    "在一分鐘的測試期間內，無絕緣崩潰（No disruptive discharge or breakdown）。",
+                    "測試儀器無顯示漏電流急遽上升或跳脫現象。"
+                ]
+            },
+            {
+                id: 4,
+                titleEn: "Voltage balance",
+                titleZh: "電壓平衡測試",
+                isDuplicateAllowed: false,
+                purpose: "確保發電機發出的三相電壓在無負載狀態下是對稱且平衡的，排除內部繞組匝間短路或接線錯誤的可能性。",
+                method: "發電機由原動機（或馬達）帶動至額定轉速，施加激磁電流使端電壓達到額定值。使用高精度電壓表量測線對線（L-L）及線對中性點（L-N）之電壓。",
+                criteria: [
+                    "三相電壓的不平衡率必須極低，依據 NEMA MG 1 規定，通常空載電壓不平衡率不得超過 1%。",
+                    "各相電壓波形應對稱一致。"
+                ]
+            },
+            {
+                id: 5,
+                titleEn: "Phase sequence",
+                titleZh: "相序測試",
+                isDuplicateAllowed: false,
+                purpose: "確認發電機的三相輸出端子（T1, T2, T3 或 U, V, W）相序正確，這對於發電機併入電網或並聯運轉是絕對關鍵的，錯誤相序會導致嚴重短路事故。",
+                method: "在發電機運轉並建立電壓後，使用相序計（Phase rotation meter）連接至輸出端子，確認依照標準規定之旋轉方向（如 A-B-C 或 U-V-W）。",
+                criteria: [
+                    "相序指示必須與銘牌標示及客戶端系統要求完全一致。",
+                    "通常標準相序為順時針方向（Clockwise）。"
+                ]
+            },
+            {
+                id: 6,
+                titleEn: "Mechanical balance",
+                titleZh: "機械平衡與振動測試",
+                isDuplicateAllowed: false,
+                purpose: "檢測轉子的動態平衡度，確保發電機在額定轉速及超速運轉下，振動值在安全範圍內，防止軸承磨損及結構疲勞損壞。",
+                method: "轉子在平衡機上或整機組裝後於測試台上運轉至額定轉速（同步轉速）。使用振動計在軸承座之垂直、水平、軸向量測振動位移（mils/μm）或振動速度（in/s 或 mm/s）。",
+                criteria: [
+                    "振動值必須低於 ISO 10816 或 NEMA MG 1 規定的限制值。",
+                    "運轉平順，無異常噪音或共振現象。"
+                ]
+            },
+            {
+                id: 7,
+                titleEn: "Open-circuit saturation curve",
+                titleZh: "開路飽和曲線 (OCC)",
+                isDuplicateAllowed: false,
+                purpose: "建立發電機磁路特性基準。顯示在定子開路狀態下，激磁電流與產生之定子端電壓的關係，用於判斷鐵心飽和點及計算同步電抗。",
+                method: "發電機維持額定轉速，定子端子開路。從零開始逐步增加激磁電流（Field current），並記錄對應的定子端電壓（Terminal voltage），直到電壓達到約 120%~130% 額定值。將數據繪製成曲線。",
+                criteria: [
+                    "曲線在低電壓區應呈線性（氣隙線 Air-gap line），在高電壓區逐漸彎曲（鐵心飽和）。",
+                    "結果需與設計預期相符，確保磁性材料品質與氣隙設計正確。"
+                ]
+            },
+            {
+                id: 8,
+                titleEn: "Short-circuit saturation curve",
+                titleZh: "短路飽和曲線 (SCC)",
+                isDuplicateAllowed: true, // (*)
+                purpose: "與 OCC 配合使用，計算發電機的同步電抗（Synchronous Reactance, Xd）與短路比（Short Circuit Ratio, SCR），評估發電機的電壓調整率及穩定度。",
+                method: "發電機維持額定轉速，定子端子以低阻抗短路。從零開始逐步增加激磁電流，記錄對應的定子短路電流，直到短路電流達到約 100%~120% 額定值。此曲線通常為一直線。",
+                criteria: [
+                    "測量數據（直線斜率）用於計算滿載所需之激磁電流。",
+                    "(*) 接受同型報告：因相同設計之電磁特性高度一致，故允許提供 duplicate generator 之數據。"
+                ]
+            },
+            {
+                id: 9,
+                titleEn: "Harmonic analysis and measurement of TIF",
+                titleZh: "諧波分析與電話干擾係數(TIF)測量",
+                isDuplicateAllowed: true, // (*)
+                purpose: "評估發電機輸出電壓的波形品質（正弦波純度）。過高的諧波會導致系統設備發熱，而特定的諧波頻率會對鄰近通訊線路造成電磁干擾（TIF）。",
+                method: "在空載及額定電壓下，使用電能品質分析儀擷取電壓波形，進行傅立葉轉換分析各次諧波成分，並透過加權網路計算出 TIF (Telephone Influence Factor) 值。",
+                criteria: [
+                    "總諧波失真（THD）通常需小於 5%，單一諧波通常需小於 3%。",
+                    "平衡 TIF 及殘餘 TIF 值需符合 ANSI C50 規範之限制。",
+                    "(*) 接受同型報告：槽數、繞組節距等決定波形的物理結構相同，結果即會相同。"
+                ]
+            },
+            {
+                id: 10,
+                titleEn: "Heat runs",
+                titleZh: "溫升測試 (Temperature Rise Test)",
+                isDuplicateAllowed: true, // (*)
+                purpose: "驗證發電機在額定負載下連續運轉時，定子繞組、轉子繞組及鐵心的溫度上升不會超過其絕緣等級（如 Class F 或 Class H）的容許極限，確保壽命。",
+                method: "讓發電機在額定負載（或等效負載法如 Zero-power-factor 法）下運轉，直到各部位溫度達到熱平衡狀態（每小時溫度變化 < 1°C 或 2°C）。利用埋設的 RTD 感測器或停機後測量電阻變化法來決定溫度。",
+                criteria: [
+                    "各部位溫升（ΔT = 實測溫度 - 冷卻介質溫度）必須低於 NEMA/IEEE 標準規定的限制值。",
+                    "(*) 接受同型報告：同型機的散熱設計、通風量與損耗特性相同，溫升結果具代表性。"
+                ]
+            },
+            {
+                id: 11,
+                titleEn: "Short-circuit tests at reduced voltage to determine reactance",
+                titleZh: "降壓短路測試以決定電抗與時間常數",
+                isDuplicateAllowed: true, // (*)
+                purpose: "求取發電機的暫態電抗 (X'd)、次暫態電抗 (X''d) 以及相關的時間常數。這些參數對於電力系統故障分析（短路電流計算）及保護電驛設定至關重要。",
+                method: "發電機在額定轉速下，設定於較低的空載電壓（避免過大破壞力），瞬間將定子三相短路。利用示波器記錄短路電流的衰減波形，透過分析交流成分與直流成分的衰減包絡線來計算參數。",
+                criteria: [
+                    "測得之 X'd, X''d 需符合設計宣告值，容許誤差通常在 ±20% 內。",
+                    "(*) 接受同型報告：屬破壞性較高且具同質性的測試，由型式測試報告提供即可。"
+                ]
+            },
+            {
+                id: 12,
+                titleEn: "Measurement of segregated losses",
+                titleZh: "分離損失測量",
+                isDuplicateAllowed: true, // (*)
+                purpose: "測量發電機的各項能量損耗（摩擦與風阻損、鐵損、銅損、雜散負載損），用以準確計算發電機在不同負載下的運轉效率。",
+                method: "透過一系列測試分離計算：原動機驅動無激磁開路運轉測風阻損；激磁開路運轉測鐵損；短路運轉測銅損及雜散損。最後套用 IEEE 115 標準公式整合計算效率。",
+                criteria: [
+                    "發電機保證效率（Guaranteed Efficiency）必須達標。",
+                    "(*) 接受同型報告：機械與電磁設計相同的機組，其各項損耗分佈基本一致。"
+                ]
+            },
+            {
+                id: 13,
+                titleEn: "Measurement of rotor impedance",
+                titleZh: "轉子阻抗測量 (交流電壓降法)",
+                isDuplicateAllowed: false,
+                purpose: "檢測轉子磁場繞組是否存在層間短路（Turn-to-turn short）。直流電阻測量不易發現少數幾匝的短路，但交流阻抗會因短路造成的反電動勢變化而明顯下降。",
+                method: "對轉子繞組施加一單相交流電壓（通常為 110V 或 220V, 50/60Hz），測量流入的交流電流並計算阻抗 (Z = V/I)。通常會在轉子靜止及旋轉時分別測量比較。",
+                criteria: [
+                    "實測阻抗值應與歷史基準值或原廠設計值相符。",
+                    "各極（Poles）間的電壓降分佈應均勻對稱。"
+                ]
+            },
+            {
+                id: 14,
+                titleEn: "Measurement of insulation resistance of armature and field",
+                titleZh: "電樞與磁場繞組絕緣電阻測量 (Megger & PI)",
+                isDuplicateAllowed: false,
+                purpose: "這是最基本的絕緣健康檢查，用以評估絕緣系統是否受潮、受污染或嚴重老化。進行高壓耐壓測試（Hi-pot）前必須先確認絕緣電阻合格。",
+                method: "使用高阻計（Megger），通常對定子施加 500V 至 5000V DC 不等（依額定電壓而定），對轉子施加 500V DC。記錄 1 分鐘及 10 分鐘的絕緣電阻值，並計算極化指數（Polarization Index, PI = R10min / R1min）。",
+                criteria: [
+                    "絕緣電阻絕對值須大於 IEEE 43 規定之最低標準（通常為 100MΩ 以上或依公式 kV+1 MΩ）。",
+                    "Class F/H 絕緣之 PI 值應大於 2.0，顯示絕緣系統乾燥且乾淨。"
+                ]
+            },
+            {
+                id: 15,
+                titleEn: "Measurement of bearing insulation resistance",
+                titleZh: "軸承絕緣電阻測量",
+                isDuplicateAllowed: false,
+                purpose: "防止軸電流（Shaft current）產生。發電機運轉時磁場不平衡可能在軸上感應電壓，若軸承未絕緣，電流將流經軸承造成電弧放電，快速破壞軸承巴氏合金或滾珠。",
+                method: "使用 500V 直流高阻計（Megger），測量軸承座（非驅動端 NDE 通常必須絕緣）與大地（發電機外殼）之間的絕緣電阻。測量前需拆除接地電刷。",
+                criteria: [
+                    "軸承絕緣電阻通常要求至少大於 1 MΩ（實務上常要求 > 10 MΩ）。",
+                    "確保軸電流路徑被有效阻斷。"
+                ]
+            },
+            {
+                id: 16,
+                titleEn: "Field coils polarity test",
+                titleZh: "磁場線圈極性測試",
+                isDuplicateAllowed: false,
+                purpose: "確保轉子各個磁極（Poles）的接線正確，必須形成 N極 與 S極 交替排列。如果極性接錯，發電機將無法正常產生正弦波電壓，甚至造成嚴重振動。（註：不適用於永磁發電機 PMG）",
+                method: "對轉子繞組施加低電壓直流電。使用指南針（Compass）或高斯計（Gauss meter）沿著轉子外圍逐一靠近每個磁極，觀察並記錄極性。",
+                criteria: [
+                    "相鄰磁極的極性必須嚴格呈現 N - S - N - S 的交替排列。",
+                    "任何極性錯誤必須在組裝定子前退回重工。"
+                ]
+            }
+        ];
+
+        // --- 2. State Management ---
+        let currentFilter = 'all'; // 'all', 'mandatory', 'duplicate'
+        let activeTestId = null;
+
+        // --- 3. DOM Elements ---
+        const listContainer = document.getElementById('test-list-container');
+        const detailContent = document.getElementById('detail-content');
+        const welcomeMessage = document.getElementById('welcome-message');
+        
+        // Detail bindings
+        const dTitleEn = document.getElementById('detail-title-en');
+        const dTitleZh = document.getElementById('detail-title-zh');
+        const dNumber = document.getElementById('detail-number');
+        const dBadge = document.getElementById('detail-badge');
+        const dPurpose = document.getElementById('detail-purpose');
+        const dMethod = document.getElementById('detail-method');
+        const dCriteria = document.getElementById('detail-criteria');
+
+        // --- 4. Initialization & Rendering logic ---
+        function renderList() {
+            listContainer.innerHTML = ''; // clear
+            
+            const filteredTests = generatorTests.filter(test => {
+                if (currentFilter === 'mandatory') return !test.isDuplicateAllowed;
+                if (currentFilter === 'duplicate') return test.isDuplicateAllowed;
+                return true; // 'all'
+            });
+
+            if (filteredTests.length === 0) {
+                listContainer.innerHTML = '<div class="p-4 text-center text-slate-500">無符合條件的項目</div>';
+                return;
+            }
+
+            filteredTests.forEach(test => {
+                // Create Card
+                const card = document.createElement('div');
+                card.className = `test-card bg-white border border-slate-200 rounded-lg p-3 flex items-center justify-between ${test.id === activeTestId ? 'active' : ''}`;
+                card.onclick = () => selectTest(test.id);
+
+                const badgeHtml = test.isDuplicateAllowed 
+                    ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold badge-duplicate shadow-sm">可出具同型報告 (*)</span>` 
+                    : `<span class="px-2 py-0.5 rounded text-[10px] font-bold badge-mandatory shadow-sm">每台必測項目</span>`;
+
+                card.innerHTML = `
+                    <div class="flex-grow pr-2">
+                        <div class="flex items-center mb-1">
+                            <span class="text-sky-600 font-bold mr-2 text-sm">#${test.id}</span>
+                            <span class="text-sm font-bold text-slate-800 line-clamp-1">${test.titleZh}</span>
+                        </div>
+                        <div class="text-xs text-slate-500 line-clamp-1">${test.titleEn}</div>
+                    </div>
+                    <div class="flex-shrink-0">
+                        ${badgeHtml}
+                    </div>
+                `;
+                listContainer.appendChild(card);
+            });
+        }
+
+        function selectTest(id) {
+            activeTestId = id;
+            renderList(); // Update active class in list
+
+            const test = generatorTests.find(t => t.id === id);
+            if(!test) return;
+
+            // Hide welcome, show content
+            welcomeMessage.style.display = 'none';
+            detailContent.classList.remove('hidden');
+            // Trigger reflow for fade in
+            void detailContent.offsetWidth;
+            detailContent.classList.add('opacity-100');
+
+            // Populate data
+            dNumber.textContent = `Test Item No. ${test.id}`;
+            dTitleEn.textContent = test.titleEn;
+            dTitleZh.textContent = test.titleZh;
+            
+            dBadge.className = `px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap shadow-sm ${test.isDuplicateAllowed ? 'badge-duplicate' : 'badge-mandatory'}`;
+            dBadge.innerHTML = test.isDuplicateAllowed ? '&#9888; 接受同型報告 (*)' : '&#10071; 每台出廠必測';
+
+            dPurpose.textContent = test.purpose;
+            dMethod.textContent = test.method;
+            
+            dCriteria.innerHTML = '';
+            test.criteria.forEach(c => {
+                const li = document.createElement('li');
+                li.className = "flex items-start";
+                li.innerHTML = `<span class="text-emerald-500 mr-2 mt-0.5">&#10003;</span> <span>${c}</span>`;
+                dCriteria.appendChild(li);
+            });
+        }
+
+        function filterTests(type) {
+            currentFilter = type;
+            
+            // Update button UI
+            ['all', 'mandatory', 'duplicate'].forEach(t => {
+                const btn = document.getElementById(`filter-${t}`);
+                if(t === type) {
+                    btn.classList.remove('text-slate-500', 'hover:text-slate-800');
+                    btn.classList.add('bg-white', 'shadow-sm', 'text-slate-800');
+                } else {
+                    btn.classList.add('text-slate-500', 'hover:text-slate-800');
+                    btn.classList.remove('bg-white', 'shadow-sm', 'text-slate-800');
+                }
+            });
+
+            renderList();
+        }
+
+        // --- 5. Chart.js Visualization (OCC/SCC Demonstration) ---
+        function initChart() {
+            const ctx = document.getElementById('saturationChart').getContext('2d');
+            
+            // Generate dummy data resembling OCC/SCC
+            const fieldCurrent = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]; // If (A)
+            const occVoltage = [0, 20, 40, 60, 78, 92, 102, 110, 115, 118, 120]; // V (%)
+            const sccCurrent = [0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150]; // I (%) Linear
+            const airGapLine = [0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200]; // Linear extension
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: fieldCurrent,
+                    datasets: [
+                        {
+                            label: '開路電壓 OCC (%)',
+                            data: occVoltage,
+                            borderColor: '#0284c7', // Sky 600
+                            backgroundColor: 'rgba(2, 132, 199, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.4,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: '氣隙線 Air-gap Line',
+                            data: airGapLine,
+                            borderColor: '#94a3b8', // Slate 400
+                            borderDash: [5, 5],
+                            borderWidth: 1,
+                            pointRadius: 0,
+                            tension: 0,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: '短路電流 SCC (%)',
+                            data: sccCurrent,
+                            borderColor: '#f59e0b', // Amber 500
+                            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                            borderWidth: 2,
+                            tension: 0, // Linear
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: { family: "'Noto Sans TC', sans-serif", size: 12 }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                            titleFont: { family: "'Noto Sans TC', sans-serif" },
+                            bodyFont: { family: "'Noto Sans TC', sans-serif" },
+                            callbacks: {
+                                title: function(context) {
+                                    return '激磁電流: ' + context[0].label + ' A';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: '激磁電流 Field Current (A)',
+                                font: { weight: 'bold' }
+                            },
+                            grid: { color: '#e2e8f0' }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: '定子端電壓 (%)',
+                                color: '#0284c7',
+                                font: { weight: 'bold' }
+                            },
+                            max: 150,
+                            grid: { color: '#e2e8f0' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: '定子短路電流 (%)',
+                                color: '#f59e0b',
+                                font: { weight: 'bold' }
+                            },
+                            max: 150,
+                            grid: { drawOnChartArea: false } // only draw grid lines for the left y-axis
+                        }
+                    }
+                }
+            });
+        }
+
+        // --- 6. Bootstrap ---
+        window.addEventListener('DOMContentLoaded', () => {
+            renderList();
+            initChart();
+        });
+
+    </script>
+</body>
+</html>
